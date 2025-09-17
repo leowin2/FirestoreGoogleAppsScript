@@ -2,3 +2,4 @@
 .vs
 gapps.config.json
 node_modules
+/build
