@@ -1,9 +1,9 @@
-{
+﻿{
   "name": "firestore_google-apps-script",
   "version": "1.0.34",
   "description": "A Google Apps Script library for accessing Google Cloud Firestore",
-  "homepage": "https://github.com/grahamearley/FirestoreGoogleAppsScript",
-  "bugs": "https://github.com/grahamearley/FirestoreGoogleAppsScript/issues",
+  "homepage": "https://github.com/leowin2/FirestoreGoogleAppsScript",
+  "bugs": "https://github.com/leowin2/FirestoreGoogleAppsScript/issues",
   "license": "MIT",
   "eslintConfig": {
     "extends": [
@@ -72,7 +72,7 @@
     "fix": "eslint --color --fix --ext .ts . && tsc || true",
     "postinstall": "replace-in-file \"declare var console\" \"//declare var console\" node_modules/@types/google-apps-script/google-apps-script.base.d.ts"
   },
-  "repository": "github:grahamearley/FirestoreGoogleAppsScript",
+  "repository": "github:leowin2/FirestoreGoogleAppsScript",
   "dependencies": {
     "@types/gapi.client": "^1.0.3",
     "@types/google-apps-script": "^1.0.14",

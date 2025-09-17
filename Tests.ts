@@ -1,4 +1,4 @@
-function StoreCredentials_(): void {
+﻿function StoreCredentials_(): void {
   /** DO NOT SAVE CREDENTIALS HERE */
   const email = 'xxx@appspot.gserviceaccount.com';
   const key = '-----BEGIN PRIVATE KEY-----\nLine\nLine\n-----END PRIVATE KEY-----';
