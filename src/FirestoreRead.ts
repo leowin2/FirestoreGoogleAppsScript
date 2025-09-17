@@ -132,6 +132,98 @@ class FirestoreRead {
 
       return documents;
     };
-    return new Query(grouped[1], callback);
+    return new Query(grouped[1], callback, false);
+  }
+
+  /**
+   * Set up a Query to receive data from a collection group (all collections with the same ID)
+   *
+   * @param {string} collectionId the collection ID to query across all documents
+   * @param {string} request the Firestore Request object to manipulate
+   * @return {object} A FirestoreQuery object to set up the query and eventually execute
+   */
+  collectionGroupQuery_(collectionId: string, request: Request): Query {
+    request.route('runQuery');
+    const callback = (query: FirestoreAPI.StructuredQuery): Document[] => {
+      // Send request to database root for collection group query
+      const payload: FirestoreAPI.RunQueryRequest = { structuredQuery: query };
+      const responseObj = request.post<FirestoreAPI.RunQueryResponse[]>('', payload);
+
+      // Filter out results without documents and unwrap document fields
+      const documents = responseObj.reduce((docs: Document[], docItem: FirestoreAPI.RunQueryResponse) => {
+        if (docItem.document) {
+          const doc = new Document(docItem.document, { readTime: docItem.readTime } as Document);
+          docs.push(doc);
+        }
+        return docs;
+      }, []);
+
+      return documents;
+    };
+    return new Query(collectionId, callback, true);
+  }
+
+  /**
+   * Set up a Query to receive data from multiple specific collections
+   *
+   * @param {string[]} collectionPaths array of collection paths to query
+   * @param {string} request the Firestore Request object to manipulate
+   * @return {object} A FirestoreQuery object to set up the query and eventually execute
+   */
+  multiCollectionQuery_(collectionPaths: string[], request: Request): Query {
+    request.route('runQuery');
+    const callback = (query: FirestoreAPI.StructuredQuery): Document[] => {
+      // Send request to database root for multi-collection query
+      const payload: FirestoreAPI.RunQueryRequest = { structuredQuery: query };
+      const responseObj = request.post<FirestoreAPI.RunQueryResponse[]>('', payload);
+
+      // Filter out results without documents and unwrap document fields
+      const documents = responseObj.reduce((docs: Document[], docItem: FirestoreAPI.RunQueryResponse) => {
+        if (docItem.document) {
+          const doc = new Document(docItem.document, { readTime: docItem.readTime } as Document);
+          docs.push(doc);
+        }
+        return docs;
+      }, []);
+
+      return documents;
+    };
+
+    // Extract collection IDs from paths for multi-collection query
+    const collectionIds = collectionPaths.map(path => {
+      const grouped = Util_.getCollectionFromPath(path);
+      return grouped[1]; // Get the collection ID
+    });
+
+    return new Query(collectionIds, callback, false);
+  }
+
+  /**
+   * Set up a Query to receive data from multiple collection groups
+   *
+   * @param {string[]} collectionIds array of collection IDs to query as groups
+   * @param {string} request the Firestore Request object to manipulate
+   * @return {object} A FirestoreQuery object to set up the query and eventually execute
+   */
+  multiCollectionGroupQuery_(collectionIds: string[], request: Request): Query {
+    request.route('runQuery');
+    const callback = (query: FirestoreAPI.StructuredQuery): Document[] => {
+      // Send request to database root for multi-collection group query
+      const payload: FirestoreAPI.RunQueryRequest = { structuredQuery: query };
+      const responseObj = request.post<FirestoreAPI.RunQueryResponse[]>('', payload);
+
+      // Filter out results without documents and unwrap document fields
+      const documents = responseObj.reduce((docs: Document[], docItem: FirestoreAPI.RunQueryResponse) => {
+        if (docItem.document) {
+          const doc = new Document(docItem.document, { readTime: docItem.readTime } as Document);
+          docs.push(doc);
+        }
+        return docs;
+      }, []);
+
+      return documents;
+    };
+
+    return new Query(collectionIds, callback, true);
   }
 }

@@ -1,0 +1,5 @@
+
+Ich habe hier im src Verzeichnis eine App Script Bibliothek (ein Fork von https://github.com/grahamearley/FirestoreGoogleAppsScript)
+Kannst du einen Plan erstellen, wie wir Transactions unterstützen können?
+Außerdem möchte ich auch die multiplen Writes von Firebase in einem Aufruf unterstützen, damit die Performance besser wird.
+Und, die Queries sollten besser unterstützt werden, StructuredQuery und auch AggregateQueries sollten voll ausschöpfbar sein.

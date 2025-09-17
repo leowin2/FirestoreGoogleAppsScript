@@ -7,6 +7,8 @@ interface QueryCallback {
 enum FieldFilterOps_ {
   '==' = 'EQUAL',
   '===' = 'EQUAL',
+  '!=' = 'NOT_EQUAL',
+  '!==' = 'NOT_EQUAL',
   '<' = 'LESS_THAN',
   '<=' = 'LESS_THAN_OR_EQUAL',
   '>' = 'GREATER_THAN',
@@ -14,6 +16,8 @@ enum FieldFilterOps_ {
   'contains' = 'ARRAY_CONTAINS',
   'containsany' = 'ARRAY_CONTAINS_ANY',
   'in' = 'IN',
+  'notin' = 'NOT_IN',
+  'not-in' = 'NOT_IN',
 }
 /**
  * @see {@link https://firebase.google.com/docs/firestore/reference/rest/v1/StructuredQuery#Operator_2 UnaryFilter Operator}
@@ -41,13 +45,25 @@ class Query implements FirestoreAPI.StructuredQuery {
   callback: QueryCallback;
 
   /**
-   * @param {string} from the base collection to query
+   * @param {string|string[]} from the base collection(s) to query
    * @param {QueryCallback} callback the function that is executed with the internally compiled query
+   * @param {boolean} isCollectionGroup whether this is a collection group query
    */
-  constructor(from: string, callback: QueryCallback) {
+  constructor(from: string | string[], callback: QueryCallback, isCollectionGroup: boolean = false) {
     this.callback = callback;
     if (from) {
-      this.from = [{ collectionId: from }];
+      if (typeof from === 'string') {
+        this.from = [{
+          collectionId: from,
+          allDescendants: isCollectionGroup
+        }];
+      } else {
+        // Multiple collections
+        this.from = from.map(collectionId => ({
+          collectionId: collectionId,
+          allDescendants: isCollectionGroup
+        }));
+      }
     }
   }
 
@@ -247,6 +263,187 @@ class Query implements FirestoreAPI.StructuredQuery {
     this.offset = start;
     this.limit = end - start;
     return this;
+  }
+
+  /**
+   * Filter Query with OR composite filter.
+   * Results must satisfy at least one of the provided filters.
+   *
+   * @param {FirestoreAPI.Filter[]} filters Array of filters to combine with OR
+   * @return {this} this query object for chaining
+   */
+  WhereOr(filters: FirestoreAPI.Filter[]): this {
+    if (filters.length < 2) {
+      throw new Error('OR filter requires at least 2 filters');
+    }
+
+    const orFilter: FirestoreAPI.Filter = {
+      compositeFilter: {
+        op: 'OR',
+        filters: filters
+      }
+    };
+
+    if (this.where) {
+      // If there's already a where clause, combine with AND
+      if (!this.where.compositeFilter || this.where.compositeFilter.op !== 'AND') {
+        this.where = {
+          compositeFilter: {
+            op: 'AND',
+            filters: [this.where, orFilter]
+          }
+        };
+      } else {
+        this.where.compositeFilter.filters!.push(orFilter);
+      }
+    } else {
+      this.where = orFilter;
+    }
+
+    return this;
+  }
+
+  /**
+   * Add a start cursor for pagination.
+   * Results will start after the provided values.
+   *
+   * @param {...any} values Values that represent a position
+   * @param {boolean} before Whether the position is just before the given values
+   * @return {this} this query object for chaining
+   */
+  StartAfter(...values: any[]): this {
+    this.startAt = {
+      values: values.map(Document.wrapValue),
+      before: false
+    };
+    return this;
+  }
+
+  /**
+   * Add a start cursor for pagination.
+   * Results will start at the provided values.
+   *
+   * @param {...any} values Values that represent a position
+   * @return {this} this query object for chaining
+   */
+  StartAt(...values: any[]): this {
+    this.startAt = {
+      values: values.map(Document.wrapValue),
+      before: true
+    };
+    return this;
+  }
+
+  /**
+   * Add an end cursor for pagination.
+   * Results will end before the provided values.
+   *
+   * @param {...any} values Values that represent a position
+   * @return {this} this query object for chaining
+   */
+  EndBefore(...values: any[]): this {
+    this.endAt = {
+      values: values.map(Document.wrapValue),
+      before: true
+    };
+    return this;
+  }
+
+  /**
+   * Add an end cursor for pagination.
+   * Results will end at the provided values.
+   *
+   * @param {...any} values Values that represent a position
+   * @return {this} this query object for chaining
+   */
+  EndAt(...values: any[]): this {
+    this.endAt = {
+      values: values.map(Document.wrapValue),
+      before: false
+    };
+    return this;
+  }
+
+  /**
+   * Add additional collections to this query.
+   * This allows querying multiple collections in a single query.
+   *
+   * @param {string|string[]} collections The collection(s) to add to the query
+   * @param {boolean} asCollectionGroup Whether to treat added collections as collection groups
+   * @return {this} this query object for chaining
+   */
+  addCollections(collections: string | string[], asCollectionGroup: boolean = false): this {
+    if (!this.from) {
+      this.from = [];
+    }
+
+    const collectionsArray = typeof collections === 'string' ? [collections] : collections;
+
+    for (const collectionId of collectionsArray) {
+      // Check if collection is already in the from clause
+      const exists = this.from.some(selector => selector.collectionId === collectionId);
+      if (!exists) {
+        this.from.push({
+          collectionId: collectionId,
+          allDescendants: asCollectionGroup
+        });
+      }
+    }
+
+    return this;
+  }
+
+  /**
+   * Add additional collection groups to this query.
+   * This is a convenience method for addCollections with asCollectionGroup=true.
+   *
+   * @param {string|string[]} collections The collection group(s) to add to the query
+   * @return {this} this query object for chaining
+   */
+  addCollectionGroups(collections: string | string[]): this {
+    return this.addCollections(collections, true);
+  }
+
+  /**
+   * Remove collections from this query.
+   *
+   * @param {string|string[]} collections The collection(s) to remove from the query
+   * @return {this} this query object for chaining
+   */
+  removeCollections(collections: string | string[]): this {
+    if (!this.from) {
+      return this;
+    }
+
+    const collectionsArray = typeof collections === 'string' ? [collections] : collections;
+
+    this.from = this.from.filter(selector =>
+      !collectionsArray.includes(selector.collectionId!)
+    );
+
+    return this;
+  }
+
+  /**
+   * Get all collections currently in this query's FROM clause.
+   *
+   * @return {string[]} Array of collection IDs
+   */
+  getCollections(): string[] {
+    return this.from ? this.from.map(selector => selector.collectionId!).filter(Boolean) : [];
+  }
+
+  /**
+   * Create a filter object that can be used with WhereOr.
+   *
+   * @param {string} field The field to reference for filtering
+   * @param {string} operator The operator to filter by
+   * @param {any} value Object to set the field value to
+   * @return {FirestoreAPI.Filter} A filter object
+   */
+  static createFilter(field: string, operator: string, value?: any): FirestoreAPI.Filter {
+    const tempQuery = new Query('temp', () => [], false);
+    return tempQuery.filter_(field, operator, value);
   }
 
   /**

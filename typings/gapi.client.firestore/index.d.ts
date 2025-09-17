@@ -2840,5 +2840,49 @@ declare namespace gapi.client {
     }
 
     const projects: ProjectsResource;
+
+    // Additional interfaces for new features
+    interface BatchWriteRequest {
+      writes?: Write[];
+      labels?: Record<string, string>;
+    }
+
+    interface BatchWriteResponse {
+      writeResults?: WriteResult[];
+      status?: Status[];
+    }
+
+    interface DocumentTransform {
+      document?: string;
+      fieldTransforms?: FieldTransform[];
+    }
+
+    interface FieldTransform {
+      fieldPath?: string;
+      setToServerValue?: string;
+      increment?: Value;
+      maximum?: Value;
+      minimum?: Value;
+      appendMissingElements?: ArrayValue;
+      removeAllFromArray?: ArrayValue;
+    }
+
+    interface RollbackRequest {
+      transaction?: string;
+    }
+
+    interface ReadOnly {
+      readTime?: string;
+    }
+
+    interface ReadWrite {
+      retryTransaction?: string;
+    }
+
+    interface Status {
+      code?: number;
+      message?: string;
+      details?: any[];
+    }
   }
 }

@@ -131,6 +131,274 @@ class Firestore implements FirestoreRead, FirestoreWrite, FirestoreDelete {
     return this.query_(path, request);
   }
   query_ = FirestoreRead.prototype.query_;
+  collectionGroupQuery_ = FirestoreRead.prototype.collectionGroupQuery_;
+  multiCollectionQuery_ = FirestoreRead.prototype.multiCollectionQuery_;
+  multiCollectionGroupQuery_ = FirestoreRead.prototype.multiCollectionGroupQuery_;
+
+  /**
+   * Query across all collections with the given collection ID.
+   * This allows you to query documents from collections with the same name
+   * across different parent documents.
+   *
+   * @param {string} collectionId the collection ID to query across all documents
+   * @return {Query} the Query object for chaining and execution
+   */
+  collectionGroup(collectionId: string): Query {
+    const request = new Request(this.baseUrl, this.authToken);
+    return this.collectionGroupQuery_(collectionId, request);
+  }
+
+  /**
+   * Query multiple specific collections in a single query.
+   * This allows you to query documents from multiple different collections.
+   *
+   * @param {string[]} collectionPaths array of collection paths to query
+   * @return {Query} the Query object for chaining and execution
+   */
+  queryMultipleCollections(collectionPaths: string[]): Query {
+    const request = new Request(this.baseUrl, this.authToken);
+    return this.multiCollectionQuery_(collectionPaths, request);
+  }
+
+  /**
+   * Query multiple collection groups in a single query.
+   * This combines collection group functionality with multi-collection querying.
+   *
+   * @param {string[]} collectionIds array of collection IDs to query as groups
+   * @return {Query} the Query object for chaining and execution
+   */
+  queryMultipleCollectionGroups(collectionIds: string[]): Query {
+    const request = new Request(this.baseUrl, this.authToken);
+    return this.multiCollectionGroupQuery_(collectionIds, request);
+  }
+
+  /**
+   * Create a new WriteBatch instance for performing multiple write operations atomically.
+   *
+   * @return {WriteBatch} a new WriteBatch instance
+   */
+  batch(): WriteBatch {
+    return new WriteBatch(this.baseUrl, this.authToken);
+  }
+
+  /**
+   * Perform multiple write operations in a single batch without transactions.
+   * Note: Operations are not atomic - each operation succeeds or fails independently.
+   *
+   * @param {FirestoreAPI.Write[]} writes array of write operations
+   * @return {FirestoreAPI.WriteResult[]} array of write results
+   */
+  batchWrite(writes: FirestoreAPI.Write[]): FirestoreAPI.WriteResult[] {
+    if (!writes || writes.length === 0) {
+      throw new Error('Cannot perform batch write with empty writes array');
+    }
+
+    const request = new Request(this.baseUrl.replace('/documents/', '/documents:batchWrite/'), this.authToken);
+    const payload: FirestoreAPI.BatchWriteRequest = {
+      writes: writes
+    };
+
+    const response = request.post<FirestoreAPI.BatchWriteResponse>('', payload);
+
+    // Check for errors in individual write results
+    if (response.status) {
+      for (let i = 0; i < response.status.length; i++) {
+        const status = response.status[i];
+        if (status.code && status.code !== 0) {
+          throw new Error(`Batch write operation ${i} failed: ${status.message || 'Unknown error'}`);
+        }
+      }
+    }
+
+    return response.writeResults || [];
+  }
+
+  /**
+   * Create a new Transaction instance for performing multiple operations atomically.
+   *
+   * @return {Transaction} a new Transaction instance
+   */
+  transaction(): Transaction {
+    return new Transaction(this.baseUrl, this.basePath, this.authToken);
+  }
+
+  /**
+   * Execute a transaction with automatic retry logic.
+   *
+   * @param {function} updateFunction function that receives a Transaction and performs operations
+   * @param {object} options transaction options (readOnly vs readWrite)
+   * @param {number} maxRetries maximum number of retries (default: 5)
+   * @return {any} the result returned by the updateFunction
+   */
+  runTransaction<T>(
+    updateFunction: (transaction: Transaction) => T,
+    options?: FirestoreAPI.TransactionOptions,
+    maxRetries: number = 5
+  ): T {
+    let lastError: Error | null = null;
+
+    for (let attempt = 0; attempt <= maxRetries; attempt++) {
+      const transaction = this.transaction();
+
+      try {
+        // Begin the transaction
+        transaction.begin(options);
+
+        // Execute the user function
+        const result = updateFunction(transaction);
+
+        // Commit the transaction
+        transaction.commit();
+
+        return result;
+      } catch (error) {
+        lastError = error as Error;
+
+        // Rollback if transaction is still active
+        if (transaction.isTransactionActive()) {
+          try {
+            transaction.rollback();
+          } catch (rollbackError) {
+            // Ignore rollback errors, focus on original error
+          }
+        }
+
+        // Check if error is retryable
+        if (this.isRetryableError(error as Error) && attempt < maxRetries) {
+          // Wait with exponential backoff
+          const delay = Math.min(1000 * Math.pow(2, attempt), 10000);
+          Utilities.sleep(delay);
+          continue;
+        }
+
+        // If not retryable or max retries exceeded, throw the error
+        throw error;
+      }
+    }
+
+    throw lastError || new Error('Transaction failed after maximum retries');
+  }
+
+  /**
+   * Check if an error is retryable (usually due to contention).
+   */
+  private isRetryableError(error: Error): boolean {
+    const message = error.message.toLowerCase();
+    return (
+      message.includes('aborted') ||
+      message.includes('conflict') ||
+      message.includes('contention') ||
+      message.includes('too much contention') ||
+      message.includes('deadline exceeded')
+    );
+  }
+
+  /**
+   * Create an aggregation query over a collection.
+   *
+   * @param path the path to the collection
+   * @return AggregateQuery instance for building aggregations
+   */
+  aggregateQuery(path: string): AggregateQuery {
+    const grouped = Util_.getCollectionFromPath(path);
+    const request = new Request(this.baseUrl, this.authToken);
+    request.route('runAggregationQuery');
+
+    const callback = (aggregateQuery: AggregateQuery): Record<string, any> => {
+      const payload: FirestoreAPI.RunAggregationQueryRequest = {
+        structuredAggregationQuery: aggregateQuery.getStructuredAggregationQuery()
+      };
+
+      const response = request.post<FirestoreAPI.RunAggregationQueryResponse>(grouped[0], payload);
+
+      if (response.result?.aggregateFields) {
+        const result: Record<string, any> = {};
+        for (const [alias, value] of Object.entries(response.result.aggregateFields)) {
+          result[alias] = Document.unwrapValue(value);
+        }
+        return result;
+      }
+
+      return {};
+    };
+
+    // Get base query if needed
+    const baseQuery: FirestoreAPI.StructuredQuery = {
+      from: [{ collectionId: grouped[1] }]
+    };
+
+    return new AggregateQuery(baseQuery, callback);
+  }
+
+  /**
+   * Create an aggregation query over a collection group.
+   *
+   * @param collectionId the collection ID to aggregate across all documents
+   * @return AggregateQuery instance for building aggregations
+   */
+  aggregateCollectionGroup(collectionId: string): AggregateQuery {
+    const request = new Request(this.baseUrl, this.authToken);
+    request.route('runAggregationQuery');
+
+    const callback = (aggregateQuery: AggregateQuery): Record<string, any> => {
+      const payload: FirestoreAPI.RunAggregationQueryRequest = {
+        structuredAggregationQuery: aggregateQuery.getStructuredAggregationQuery()
+      };
+
+      const response = request.post<FirestoreAPI.RunAggregationQueryResponse>('', payload);
+
+      if (response.result?.aggregateFields) {
+        const result: Record<string, any> = {};
+        for (const [alias, value] of Object.entries(response.result.aggregateFields)) {
+          result[alias] = Document.unwrapValue(value);
+        }
+        return result;
+      }
+
+      return {};
+    };
+
+    // Create base query for collection group
+    const baseQuery: FirestoreAPI.StructuredQuery = {
+      from: [{
+        collectionId: collectionId,
+        allDescendants: true
+      }]
+    };
+
+    return new AggregateQuery(baseQuery, callback);
+  }
+
+  /**
+   * Create an aggregation query from an existing Query.
+   *
+   * @param query the base query to aggregate over
+   * @return AggregateQuery instance for building aggregations
+   */
+  aggregateFromQuery(query: Query): AggregateQuery {
+    const request = new Request(this.baseUrl, this.authToken);
+    request.route('runAggregationQuery');
+
+    const callback = (aggregateQuery: AggregateQuery): Record<string, any> => {
+      const payload: FirestoreAPI.RunAggregationQueryRequest = {
+        structuredAggregationQuery: aggregateQuery.getStructuredAggregationQuery()
+      };
+
+      const response = request.post<FirestoreAPI.RunAggregationQueryResponse>('', payload);
+
+      if (response.result?.aggregateFields) {
+        const result: Record<string, any> = {};
+        for (const [alias, value] of Object.entries(response.result.aggregateFields)) {
+          result[alias] = Document.unwrapValue(value);
+        }
+        return result;
+      }
+
+      return {};
+    };
+
+    return new AggregateQuery(query as FirestoreAPI.StructuredQuery, callback);
+  }
 }
 
 type Version = 'v1' | 'v1beta1' | 'v1beta2';
