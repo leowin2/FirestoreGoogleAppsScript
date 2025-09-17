@@ -1,22 +1,22 @@
-import { babel } from "@rollup/plugin-babel";
-import { nodeResolve } from "@rollup/plugin-node-resolve";
-
-const extensions = [".ts", ".js"];
-
-const preventTreeShakingPlugin = () => {
+import { babel } from "@rollup/plugin-babel"; import { nodeResolve } from "@rollup/plugin-node-resolve"; const extensions = [ ".ts", ".js" ]; const preventTreeShakingPlugin = () => {
   return {
     name: "no-treeshaking",
-    resolveId(id, importer) {
-      if (!importer) {
+    resolveId(id,
+    importer) {
+      if (!importer)
+      {
         // let's not treeshake entry points, as we're not exporting anything in App Scripts
-        return { id, moduleSideEffects: "no-treeshake" };
+        return {
+          id,
+          moduleSideEffects: "no-treeshake"
+        }
+        ;
       }
       return null;
     },
-  };
-};
-
-export default [
+  }
+  ;
+}; export default [
   "./src/Auth.ts",
   "./src/Document.ts",
   "./src/Firestore.ts",
@@ -26,24 +26,32 @@ export default [
   "./src/Query.ts",
   "./src/Request.ts",
   "./src/Tests.ts",
-  "./src/Util.ts"
-].map(input => ({
+  "./src/Util.ts",
+  "./src/AggregateQuery.ts",
+  "./src/Examples.ts",
+  "./src/Transaction.ts",
+  "./src/WriteBatch.ts"
+].map(input => ( {
   input,
   output: {
     dir: "build",
     format: "cjs",
   },
-  external: [/^@babel\/runtime/],
+  external: [ /^@babel\/runtime/ ],
   plugins: [
     preventTreeShakingPlugin(),
-    nodeResolve({
+    nodeResolve(
+    {
       extensions,
-      mainFields: ["jsnext:main", "main"],
-    }),
-    babel({
+      mainFields: [ "jsnext:main", "main" ],
+    }
+    ),
+    babel(
+    {
       extensions,
       babelHelpers: "bundled",
       exclude: "node_modules/**"
-    }),
+    }
+    ),
   ],
 }));
