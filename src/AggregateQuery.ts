@@ -153,7 +153,7 @@ declare namespace FirestoreAPI {
   }
 
   interface RunAggregationQueryResponse {
-    result?: AggregationResult;
+    result?: AggregationResult[];
     transaction?: string;
     readTime?: string;
   }

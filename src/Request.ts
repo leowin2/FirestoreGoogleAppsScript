@@ -70,7 +70,13 @@ class Request {
    * @return {this} this request to be chained
    */
   addParam(key: string, value: string): this {
-    this.queryString += (this.queryString.startsWith('?') ? '&' : '?') + Util_.parameterize({ [key]: value });
+    // Special handling for transaction parameter to prevent double-encoding
+    if (key === 'transaction') {
+      // Transaction IDs are already base64 encoded and should not be further encoded
+      this.queryString += (this.queryString.startsWith('?') ? '&' : '?') + `${key}=${value}`;
+    } else {
+      this.queryString += (this.queryString.startsWith('?') ? '&' : '?') + Util_.parameterize({ [key]: value });
+    }
     return this;
   }
 

@@ -18,7 +18,8 @@
     "noEmit": true
   },
   "include": [
-    "src"
+    "src",
+    "typings"
   ]
 }
   

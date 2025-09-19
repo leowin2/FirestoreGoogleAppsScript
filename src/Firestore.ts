@@ -311,15 +311,24 @@ class Firestore implements FirestoreRead, FirestoreWrite, FirestoreDelete {
 
       const response = request.post<FirestoreAPI.RunAggregationQueryResponse>(grouped[0], payload);
 
-      if (response.result?.aggregateFields) {
+      // Debug logging
+      console.log('AggregateQuery Response:', JSON.stringify(response));
+
+      // Handle both single result and array response formats
+      const results = Array.isArray(response.result) ? response.result : [response.result];
+
+      if (results && results.length > 0 && results[0]?.aggregateFields) {
         const result: Record<string, any> = {};
-        for (const [alias, value] of Object.entries(response.result.aggregateFields)) {
+        for (const [alias, value] of Object.entries(results[0].aggregateFields)) {
+          console.log(`Processing aggregate field ${alias}:`, JSON.stringify(value));
           result[alias] = Document.unwrapValue(value);
         }
         return result;
       }
 
-      return {};
+      // Fallback: return raw response if structure doesn't match
+      console.log('Unexpected aggregate response structure, returning raw response');
+      return response;
     };
 
     // Get base query if needed
@@ -347,15 +356,24 @@ class Firestore implements FirestoreRead, FirestoreWrite, FirestoreDelete {
 
       const response = request.post<FirestoreAPI.RunAggregationQueryResponse>('', payload);
 
-      if (response.result?.aggregateFields) {
+      // Debug logging
+      console.log('AggregateCollectionGroup Response:', JSON.stringify(response));
+
+      // Handle both single result and array response formats
+      const results = Array.isArray(response.result) ? response.result : [response.result];
+
+      if (results && results.length > 0 && results[0]?.aggregateFields) {
         const result: Record<string, any> = {};
-        for (const [alias, value] of Object.entries(response.result.aggregateFields)) {
+        for (const [alias, value] of Object.entries(results[0].aggregateFields)) {
+          console.log(`Processing aggregate field ${alias}:`, JSON.stringify(value));
           result[alias] = Document.unwrapValue(value);
         }
         return result;
       }
 
-      return {};
+      // Fallback: return raw response if structure doesn't match
+      console.log('Unexpected aggregate response structure, returning raw response');
+      return response;
     };
 
     // Create base query for collection group
@@ -386,15 +404,24 @@ class Firestore implements FirestoreRead, FirestoreWrite, FirestoreDelete {
 
       const response = request.post<FirestoreAPI.RunAggregationQueryResponse>('', payload);
 
-      if (response.result?.aggregateFields) {
+      // Debug logging
+      console.log('AggregateFromQuery Response:', JSON.stringify(response));
+
+      // Handle both single result and array response formats
+      const results = Array.isArray(response.result) ? response.result : [response.result];
+
+      if (results && results.length > 0 && results[0]?.aggregateFields) {
         const result: Record<string, any> = {};
-        for (const [alias, value] of Object.entries(response.result.aggregateFields)) {
+        for (const [alias, value] of Object.entries(results[0].aggregateFields)) {
+          console.log(`Processing aggregate field ${alias}:`, JSON.stringify(value));
           result[alias] = Document.unwrapValue(value);
         }
         return result;
       }
 
-      return {};
+      // Fallback: return raw response if structure doesn't match
+      console.log('Unexpected aggregate response structure, returning raw response');
+      return response;
     };
 
     return new AggregateQuery(query as FirestoreAPI.StructuredQuery, callback);

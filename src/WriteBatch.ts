@@ -202,7 +202,17 @@ class WriteBatch {
       throw new Error('Cannot commit empty batch');
     }
 
-    const request = new Request(this.baseUrl.replace('/documents/', '/documents:batchWrite/'), this.authToken);
+    // Fix the URL construction for batchWrite
+    let batchWriteUrl = this.baseUrl;
+    if (batchWriteUrl.includes('/documents')) {
+      batchWriteUrl = batchWriteUrl.replace('/documents', ':batchWrite');
+    } else {
+      batchWriteUrl = batchWriteUrl.replace(/\/$/, '') + ':batchWrite';
+    }
+
+    console.log('WriteBatch commit URL:', batchWriteUrl);
+
+    const request = new Request(batchWriteUrl, this.authToken);
     const payload: FirestoreAPI.BatchWriteRequest = {
       writes: this.writes
     };
@@ -239,6 +249,29 @@ class WriteBatch {
    */
   private getFullDocumentPath(path: string): string {
     const cleanPath = Util_.cleanPath(path);
-    return this.baseUrl.replace('/documents/', '/documents/').replace(/\/$/, '') + '/' + cleanPath;
+
+    // Ensure the baseUrl already contains the full path including documents/
+    let fullUrl = this.baseUrl;
+    if (!fullUrl.endsWith('/')) {
+      fullUrl += '/';
+    }
+
+    // If baseUrl doesn't end with documents/, add it
+    if (!fullUrl.includes('/documents/')) {
+      fullUrl = fullUrl.replace(/\/$/, '') + '/documents/';
+    }
+
+    const documentPath = fullUrl + cleanPath;
+
+    // Debug logging to help identify the issue
+    console.log('WriteBatch getFullDocumentPath:', {
+      path: path,
+      cleanPath: cleanPath,
+      baseUrl: this.baseUrl,
+      fullUrl: fullUrl,
+      documentPath: documentPath
+    });
+
+    return documentPath;
   }
 }

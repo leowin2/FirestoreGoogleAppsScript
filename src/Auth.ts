@@ -31,7 +31,16 @@ class Auth {
    * @returns {string} The generated access token string
    */
   get accessToken(): string {
+    const tokenCacheTTL = 1800; //half an hour
+    const token = CacheService.getScriptCache().get("AT-" + this.email);
+    if (token) {
+      Logger.log("token resolved from cache");
+      return token;
+    }
     const request = new Request(this.authUrl, '', this.options_).post<TokenResponse>();
+    if (request.access_token) {
+      CacheService.getScriptCache().put("AT-" + this.email, request.access_token, tokenCacheTTL);
+    }
     return request.access_token;
   }
 

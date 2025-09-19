@@ -37,7 +37,23 @@ class Transaction {
     };
 
     const response = request.post<FirestoreAPI.BeginTransactionResponse>('', payload);
-    this.transactionId = response.transaction;
+
+    if (response.transaction) {
+      try {
+        // Decode the base64 transaction ID and re-encode it as URL-safe base64
+        const cleanTransaction = response.transaction.replace(/\s+/g, '');
+        const decoded = Utilities.base64Decode(cleanTransaction);
+        this.transactionId = Utilities.base64EncodeWebSafe(decoded);
+      } catch (error) {
+        // Fallback: convert to URL-safe manually
+        this.transactionId = response.transaction
+          .replace(/\s+/g, '')
+          .replace(/\+/g, '-')
+          .replace(/\//g, '_')
+          .replace(/=/g, '');
+      }
+    }
+
     this.isActive = true;
 
     return this;
@@ -225,6 +241,36 @@ class Transaction {
   }
 
   /**
+   * Apply a transformation to a document's field within the transaction.
+   *
+   * @param path the path to the document to transform
+   * @param field the field to transform
+   * @param transformation the transformation to apply
+   * @return this Transaction instance for chaining
+   */
+  transform(path: string, field: string, transformation: FirestoreAPI.FieldTransform): this {
+    if (!this.isActive) {
+      throw new Error('Transaction is not active');
+    }
+
+    const fullPath = this.getFullDocumentPath(path);
+
+    this.writes.push({
+      transform: {
+        document: fullPath,
+        fieldTransforms: [
+          {
+            fieldPath: field,
+            ...transformation
+          }
+        ]
+      }
+    });
+
+    return this;
+  }
+
+  /**
    * Commit the transaction.
    *
    * @return array of write results
@@ -298,6 +344,6 @@ class Transaction {
    */
   private getFullDocumentPath(path: string): string {
     const cleanPath = Util_.cleanPath(path);
-    return this.baseUrl.replace('/documents/', '/documents/').replace(/\/$/, '') + '/' + cleanPath;
+    return this.basePath.replace(/\/$/, '') + '/' + cleanPath.replace(/^\//, '');
   }
 }
