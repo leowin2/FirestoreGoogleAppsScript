@@ -56,7 +56,7 @@ class Firestore implements FirestoreRead, FirestoreWrite, FirestoreDelete {
       docs = this.query(path).Execute() as Document[];
     } else {
       const request = new Request(this.baseUrl.replace('/documents/', '/documents:batchGet/'), this.authToken);
-      docs = this.getDocuments_(this.basePath + path, request, ids);
+      docs = this.getDocuments_(this.basePath + Util_.cleanDocumentPath(path), request, ids);
     }
     return docs;
   }
@@ -178,7 +178,7 @@ class Firestore implements FirestoreRead, FirestoreWrite, FirestoreDelete {
    * @return {WriteBatch} a new WriteBatch instance
    */
   batch(): WriteBatch {
-    return new WriteBatch(this.baseUrl, this.authToken);
+    return new WriteBatch(this.baseUrl, this.basePath, this.authToken);
   }
 
   /**
@@ -193,7 +193,7 @@ class Firestore implements FirestoreRead, FirestoreWrite, FirestoreDelete {
       throw new Error('Cannot perform batch write with empty writes array');
     }
 
-    const request = new Request(this.baseUrl.replace('/documents/', '/documents:batchWrite/'), this.authToken);
+    const request = new Request(this.baseUrl.replace(/\/$/, '') + ':batchWrite', this.authToken);
     const payload: FirestoreAPI.BatchWriteRequest = {
       writes: writes
     };
@@ -311,16 +311,12 @@ class Firestore implements FirestoreRead, FirestoreWrite, FirestoreDelete {
 
       const response = request.post<FirestoreAPI.RunAggregationQueryResponse>(grouped[0], payload);
 
-      // Debug logging
-      console.log('AggregateQuery Response:', JSON.stringify(response));
+      // Handle response format - the response is directly an array of results
+      const results = Array.isArray(response) ? response : [response];
 
-      // Handle both single result and array response formats
-      const results = Array.isArray(response.result) ? response.result : [response.result];
-
-      if (results && results.length > 0 && results[0]?.aggregateFields) {
+      if (results && results.length > 0 && results[0]?.result?.aggregateFields) {
         const result: Record<string, any> = {};
-        for (const [alias, value] of Object.entries(results[0].aggregateFields)) {
-          console.log(`Processing aggregate field ${alias}:`, JSON.stringify(value));
+        for (const [alias, value] of Object.entries(results[0].result.aggregateFields)) {
           result[alias] = Document.unwrapValue(value);
         }
         return result;
@@ -359,13 +355,12 @@ class Firestore implements FirestoreRead, FirestoreWrite, FirestoreDelete {
       // Debug logging
       console.log('AggregateCollectionGroup Response:', JSON.stringify(response));
 
-      // Handle both single result and array response formats
-      const results = Array.isArray(response.result) ? response.result : [response.result];
+      // Handle response format - the response is directly an array of results
+      const results = Array.isArray(response) ? response : [response];
 
-      if (results && results.length > 0 && results[0]?.aggregateFields) {
+      if (results && results.length > 0 && results[0]?.result?.aggregateFields) {
         const result: Record<string, any> = {};
-        for (const [alias, value] of Object.entries(results[0].aggregateFields)) {
-          console.log(`Processing aggregate field ${alias}:`, JSON.stringify(value));
+        for (const [alias, value] of Object.entries(results[0].result.aggregateFields)) {
           result[alias] = Document.unwrapValue(value);
         }
         return result;
@@ -405,15 +400,13 @@ class Firestore implements FirestoreRead, FirestoreWrite, FirestoreDelete {
       const response = request.post<FirestoreAPI.RunAggregationQueryResponse>('', payload);
 
       // Debug logging
-      console.log('AggregateFromQuery Response:', JSON.stringify(response));
 
-      // Handle both single result and array response formats
-      const results = Array.isArray(response.result) ? response.result : [response.result];
+      // Handle response format - the response is directly an array of results
+      const results = Array.isArray(response) ? response : [response];
 
-      if (results && results.length > 0 && results[0]?.aggregateFields) {
+      if (results && results.length > 0 && results[0]?.result?.aggregateFields) {
         const result: Record<string, any> = {};
-        for (const [alias, value] of Object.entries(results[0].aggregateFields)) {
-          console.log(`Processing aggregate field ${alias}:`, JSON.stringify(value));
+        for (const [alias, value] of Object.entries(results[0].result.aggregateFields)) {
           result[alias] = Document.unwrapValue(value);
         }
         return result;

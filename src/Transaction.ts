@@ -92,7 +92,7 @@ class Transaction {
     }
 
     const request = new Request(this.baseUrl.replace('/documents/', '/documents:batchGet/'), this.authToken);
-    const absolutePaths = paths.map(path => this.basePath + path);
+    const absolutePaths = paths.map(path => this.getFullDocumentPath(path));
     const payload: FirestoreAPI.BatchGetDocumentsRequest = {
       documents: absolutePaths,
       transaction: this.transactionId
@@ -343,7 +343,7 @@ class Transaction {
    * Convert a document path to a full Firestore document name.
    */
   private getFullDocumentPath(path: string): string {
-    const cleanPath = Util_.cleanPath(path);
+    const cleanPath = Util_.cleanDocumentPath(path);
     return this.basePath.replace(/\/$/, '') + '/' + cleanPath.replace(/^\//, '');
   }
 }

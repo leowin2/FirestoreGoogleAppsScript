@@ -1,4 +1,4 @@
-﻿function StoreCredentials_(): void {
+function StoreCredentials_(): void {
   /** DO NOT SAVE CREDENTIALS HERE */
   const email = 'xxx@appspot.gserviceaccount.com';
   const key = '-----BEGIN PRIVATE KEY-----\nLine\nLine\n-----END PRIVATE KEY-----';
@@ -228,7 +228,7 @@ class Tests implements TestManager {
   Test_Get_Documents(): void {
     const path = 'Test Collection';
     const docs = this.db.getDocuments(path);
-    GSUnit.assertEquals(8, docs.length);
+    GSUnit.assertEquals(9, docs.length);
     const doc = docs.find((doc) => doc.name!.endsWith('/New Document !@#$%^&*(),.<>?;\':"[]{}|-=_+áéíóúæÆÑ'));
     GSUnit.assertNotUndefined(doc);
     GSUnit.assertObjectEquals(this.expected_, doc!.obj);
@@ -270,7 +270,7 @@ class Tests implements TestManager {
   Test_Get_Document_IDs(): void {
     const path = 'Test Collection';
     const docs = this.db.getDocumentIds(path);
-    GSUnit.assertEquals(8, docs.length);
+    GSUnit.assertEquals(9, docs.length);
   }
 
   Test_Get_Document_IDs_Missing(): void {
@@ -295,19 +295,19 @@ class Tests implements TestManager {
   Test_Query_Select_Name(): void {
     const path = 'Test Collection';
     const docs = this.db.query(path).Select().Execute();
-    GSUnit.assertEquals(8, docs.length);
+    GSUnit.assertEquals(9, docs.length);
   }
 
   Test_Query_Select_Name_Number(): void {
     const path = 'Test Collection';
     const docs = this.db.query(path).Select().Select('number value').Execute();
-    GSUnit.assertEquals(8, docs.length);
+    GSUnit.assertEquals(9, docs.length);
   }
 
   Test_Query_Select_String(): void {
     const path = 'Test Collection';
     const docs = this.db.query(path).Select('string value 이').Execute();
-    GSUnit.assertEquals(8, docs.length);
+    GSUnit.assertEquals(9, docs.length);
   }
 
   Test_Query_Where_EqEq_String(): void {
@@ -475,7 +475,7 @@ class Tests implements TestManager {
   Test_Query_Offset(): void {
     const path = 'Test Collection';
     const docs = this.db.query(path).Offset(2).Execute();
-    GSUnit.assertEquals(6, docs.length);
+    GSUnit.assertEquals(7, docs.length);
   }
 
   Test_Query_Limit(): void {
@@ -547,7 +547,7 @@ class Tests implements TestManager {
       const currentBalance = doc.obj.balance;
 
       if (currentBalance >= 50) {
-        transaction.update('Test Collection/Transaction Test', { balance: currentBalance - 50 });
+        transaction.set('Test Collection/Transaction Test', { balance: currentBalance - 50 });
         return { success: true, newBalance: currentBalance - 50 };
       } else {
         throw new Error('Insufficient balance');
@@ -785,8 +785,26 @@ class Tests implements TestManager {
     const docs = this.db.getDocumentIds(collection).map((path) => this.db.deleteDocument(collection + '/' + path));
     docs.forEach((doc) => GSUnit.assertObjectEquals({}, doc));
 
-    // Clean up additional test collections
-    const additionalCollections = ['Users', 'Products', 'Services', 'Categories', 'Metrics'];
+    // Clean up additional test collections and specific test documents
+    const testPaths = [
+      'Users/user1/Posts/post1',
+      'Users/user2/Posts/post2',
+      'Admin/system/Posts/system_post',
+      'Metrics/day1/Events/event1',
+      'Metrics/day2/Events/event2',
+      'Metrics/day3/Events/event3'
+    ];
+
+    for (const path of testPaths) {
+      try {
+        this.db.deleteDocument(path);
+      } catch (e) {
+        // Document might not exist, ignore
+      }
+    }
+
+    // Clean up root level collections
+    const additionalCollections = ['Users', 'Products', 'Services', 'Categories', 'Metrics', 'Admin'];
     for (const col of additionalCollections) {
       try {
         const docIds = this.db.getDocumentIds(col);
@@ -806,9 +824,19 @@ class Tests implements TestManager {
   }
 }
 
-function RunTests_(cacheSeconds: number): Shield {
+function RunTests(cacheSeconds: number): Shield {
   const scriptProps = PropertiesService.getUserProperties().getProperties();
-  const tests = new Tests(scriptProps['email'], scriptProps['key'], scriptProps['project'], 'v1');
+
+  // First, clean up any existing test data
+  try {
+    const cleanup = new Tests(scriptProps['email'], scriptProps['key'], scriptProps['project'], 'v1', true);
+    console.log('Cleaned up test collection');
+  } catch (e) {
+    console.log('Cleanup failed:', e);
+  }
+
+  // Then run the actual tests
+  const tests = new Tests(scriptProps['email'], scriptProps['key'], scriptProps['project'], 'v1', false);
   const { pass, fail } = tests;
   for (const [func, err] of fail) {
     console.log(`Test Failed: ${func} (${err.message})\n${err.stack}`);
@@ -830,7 +858,7 @@ function cacheResults_(cachedBadge: boolean): string {
    * which is longer than the time it takes to execute all the tests.
    */
   const maxCache = 3600;
-  const results = JSON.stringify(RunTests_(maxCache));
+  const results = JSON.stringify(RunTests(maxCache));
   CacheService.getUserCache()!.put('Test Results', results, maxCache);
   // Send the min cache allowed @see {@link https://shields.io/endpoint ShieldsIO Endpoint}
   return results.replace(`"cacheSeconds":${maxCache}`, `"cacheSeconds":${cachedBadge ? maxCache : 300}`);

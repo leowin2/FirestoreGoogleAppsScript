@@ -55,7 +55,19 @@ class Request {
     this.options['method'] = type;
 
     const response: GoogleAppsScript.URL_Fetch.HTTPResponse = UrlFetchApp.fetch(url, this.options);
-    const responseObj: T = JSON.parse(response.getContentText());
+    const contentText = response.getContentText();
+
+    // Check if response is HTML (error page) instead of JSON
+    if (contentText.trim().startsWith('<!DOCTYPE') || contentText.trim().startsWith('<html')) {
+      throw new Error(`HTTP ${response.getResponseCode()}: Received HTML error page instead of JSON response. URL: ${url}`);
+    }
+
+    let responseObj: T;
+    try {
+      responseObj = JSON.parse(contentText);
+    } catch (parseError) {
+      throw new Error(`Failed to parse JSON response. Status: ${response.getResponseCode()}, Content: ${contentText.substring(0, 200)}...`);
+    }
 
     this.checkForError(responseObj);
     return responseObj;

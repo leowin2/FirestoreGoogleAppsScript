@@ -72,11 +72,11 @@ class Document implements FirestoreAPI.Document, FirestoreAPI.MapValue {
       case 'integerValue':
         return parseInt(val as string);
       case 'mapValue':
-        return this.unwrapObject(val as FirestoreAPI.MapValue);
+        return Document.unwrapObject(val as FirestoreAPI.MapValue);
       case 'arrayValue':
-        return this.unwrapArray(val.values);
+        return Document.unwrapArray(val.values);
       case 'timestampValue':
-        return this.unwrapDate(val as string);
+        return Document.unwrapDate(val as string);
       case 'nullValue':
       default:
         return null;
@@ -106,27 +106,27 @@ class Document implements FirestoreAPI.Document, FirestoreAPI.MapValue {
     const type = typeof val;
     switch (type) {
       case 'string':
-        return this.wrapString(val as string);
+        return Document.wrapString(val as string);
       case 'object':
-        return this.wrapObject(val as ValueObject);
+        return Document.wrapObject(val as ValueObject);
       case 'number':
-        return this.wrapNumber(val as number);
+        return Document.wrapNumber(val as number);
       case 'boolean':
-        return this.wrapBoolean(val as boolean);
+        return Document.wrapBoolean(val as boolean);
       default:
-        return this.wrapNull();
+        return Document.wrapNull();
     }
   }
 
   static wrapString(string: string): FirestoreAPI.Value {
     // Test for root path reference inclusion (see Util.js)
     if (Util_.regexPath.test(string)) {
-      return this.wrapRef(string);
+      return Document.wrapRef(string);
     }
 
     // Test for binary data in string (see Util.js)
     if (Util_.regexBinary.test(string)) {
-      return this.wrapBytes(string);
+      return Document.wrapBytes(string);
     }
 
     return { stringValue: string };
@@ -134,24 +134,24 @@ class Document implements FirestoreAPI.Document, FirestoreAPI.MapValue {
 
   static wrapObject(obj: ValueObject): FirestoreAPI.Value {
     if (!obj) {
-      return this.wrapNull();
+      return Document.wrapNull();
     }
 
     if (Array.isArray(obj)) {
-      return this.wrapArray(obj);
+      return Document.wrapArray(obj);
     }
 
     // instanceof fails for code referencing this library
     if (obj instanceof Date || obj.constructor.name === 'Date') {
-      return this.wrapDate((obj as any) as Date);
+      return Document.wrapDate((obj as any) as Date);
     }
 
     // Check if LatLng type
     if (Object.keys(obj).length === 2 && 'latitude' in obj && 'longitude' in obj) {
-      return this.wrapLatLong(obj as FirestoreAPI.LatLng);
+      return Document.wrapLatLong(obj as FirestoreAPI.LatLng);
     }
 
-    return { mapValue: this.wrapMap(obj) };
+    return { mapValue: Document.wrapMap(obj) };
   }
 
   static wrapMap(obj: ValueObject): FirestoreAPI.MapValue {
@@ -176,7 +176,7 @@ class Document implements FirestoreAPI.Document, FirestoreAPI.MapValue {
   }
 
   static wrapNumber(num: number): FirestoreAPI.Value {
-    const func = Util_.isInt(num) ? this.wrapInt : this.wrapDouble;
+    const func = Util_.isInt(num) ? Document.wrapInt : Document.wrapDouble;
     return func(num);
   }
 

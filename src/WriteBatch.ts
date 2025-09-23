@@ -4,14 +4,17 @@
 class WriteBatch {
   private writes: FirestoreAPI.Write[] = [];
   private baseUrl: string;
+  private basePath: string;
   private authToken: string;
 
   /**
    * @param baseUrl The Firestore base URL
+   * @param basePath The Firestore base path
    * @param authToken The authentication token
    */
-  constructor(baseUrl: string, authToken: string) {
+  constructor(baseUrl: string, basePath: string, authToken: string) {
     this.baseUrl = baseUrl;
+    this.basePath = basePath;
     this.authToken = authToken;
   }
 
@@ -158,22 +161,18 @@ class WriteBatch {
           fieldTransforms.push({
             fieldPath: `\`${field.replace(/`/g, '\\`')}\``,
             appendMissingElements: {
-              arrayValue: {
-                values: Array.isArray(transform.arrayUnion)
-                  ? transform.arrayUnion.map(Document.wrapValue)
-                  : [Document.wrapValue(transform.arrayUnion)]
-              }
+              values: Array.isArray(transform.arrayUnion)
+                ? transform.arrayUnion.map(Document.wrapValue)
+                : [Document.wrapValue(transform.arrayUnion)]
             }
           });
         } else if (transform.arrayRemove) {
           fieldTransforms.push({
             fieldPath: `\`${field.replace(/`/g, '\\`')}\``,
             removeAllFromArray: {
-              arrayValue: {
-                values: Array.isArray(transform.arrayRemove)
-                  ? transform.arrayRemove.map(Document.wrapValue)
-                  : [Document.wrapValue(transform.arrayRemove)]
-              }
+              values: Array.isArray(transform.arrayRemove)
+                ? transform.arrayRemove.map(Document.wrapValue)
+                : [Document.wrapValue(transform.arrayRemove)]
             }
           });
         }
@@ -203,14 +202,7 @@ class WriteBatch {
     }
 
     // Fix the URL construction for batchWrite
-    let batchWriteUrl = this.baseUrl;
-    if (batchWriteUrl.includes('/documents')) {
-      batchWriteUrl = batchWriteUrl.replace('/documents', ':batchWrite');
-    } else {
-      batchWriteUrl = batchWriteUrl.replace(/\/$/, '') + ':batchWrite';
-    }
-
-    console.log('WriteBatch commit URL:', batchWriteUrl);
+    const batchWriteUrl = this.baseUrl.replace(/\/$/, '') + ':batchWrite';
 
     const request = new Request(batchWriteUrl, this.authToken);
     const payload: FirestoreAPI.BatchWriteRequest = {
@@ -248,30 +240,10 @@ class WriteBatch {
    * Convert a document path to a full Firestore document name.
    */
   private getFullDocumentPath(path: string): string {
-    const cleanPath = Util_.cleanPath(path);
+    const cleanPath = Util_.cleanDocumentPath(path);
 
-    // Ensure the baseUrl already contains the full path including documents/
-    let fullUrl = this.baseUrl;
-    if (!fullUrl.endsWith('/')) {
-      fullUrl += '/';
-    }
-
-    // If baseUrl doesn't end with documents/, add it
-    if (!fullUrl.includes('/documents/')) {
-      fullUrl = fullUrl.replace(/\/$/, '') + '/documents/';
-    }
-
-    const documentPath = fullUrl + cleanPath;
-
-    // Debug logging to help identify the issue
-    console.log('WriteBatch getFullDocumentPath:', {
-      path: path,
-      cleanPath: cleanPath,
-      baseUrl: this.baseUrl,
-      fullUrl: fullUrl,
-      documentPath: documentPath
-    });
-
-    return documentPath;
+    // Return just the Firestore document path, not the full URL
+    // basePath already contains: projects/{project}/databases/(default)/documents/
+    return this.basePath.replace(/\/$/, '') + '/' + cleanPath.replace(/^\//, '');
   }
 }

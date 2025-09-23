@@ -142,6 +142,27 @@ class Util_ {
     return this.cleanParts(path.split('/')).join('/');
   }
 
+  /**
+   * Validates and cleans Firestore document path without URL encoding
+   *
+   * @param {string} path the document path to clean
+   * @return {string} cleaned path without URL encoding
+   * @throws {Error} Validation errors if it doesn't meet API guidelines
+   */
+  static cleanDocumentPath(path: string): string {
+    const parts = path.split('/');
+    return parts.map(function (part, i) {
+      const type = i & 1 ? 'Collection' : 'Document';
+      if (part === '.' || part === '..') {
+        throw new TypeError(type + ' name cannot solely consist of a single period (.) or double periods (..)');
+      }
+      if (part.indexOf('__') === 0 && part.endsWith('__')) {
+        throw new TypeError(type + ' name cannot be a dunder name (begin and end with double underscores)');
+      }
+      return part; // No URL encoding for Firestore document paths
+    }).join('/');
+  }
+
   static parameterize(obj: any, encode = true): string {
     const process = encode ? encodeURI : (s: string): string => s;
     return Object.entries<string>(obj)

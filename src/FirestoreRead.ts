@@ -173,29 +173,37 @@ class FirestoreRead {
   multiCollectionQuery_(collectionPaths: string[], request: Request): Query {
     request.route('runQuery');
     const callback = (query: FirestoreAPI.StructuredQuery): Document[] => {
-      // Send request to database root for multi-collection query
-      const payload: FirestoreAPI.RunQueryRequest = { structuredQuery: query };
-      const responseObj = request.post<FirestoreAPI.RunQueryResponse[]>('', payload);
+      // Execute separate queries for each collection and combine results
+      const allDocuments: Document[] = [];
 
-      // Filter out results without documents and unwrap document fields
-      const documents = responseObj.reduce((docs: Document[], docItem: FirestoreAPI.RunQueryResponse) => {
-        if (docItem.document) {
-          const doc = new Document(docItem.document, { readTime: docItem.readTime } as Document);
-          docs.push(doc);
-        }
-        return docs;
-      }, []);
+      for (const collectionPath of collectionPaths) {
+        // Create a separate query for each collection
+        const singleCollectionQuery = { ...query };
+        singleCollectionQuery.from = [{
+          collectionId: collectionPath,
+          allDescendants: false
+        }];
 
-      return documents;
+        const payload: FirestoreAPI.RunQueryRequest = { structuredQuery: singleCollectionQuery };
+        const responseObj = request.post<FirestoreAPI.RunQueryResponse[]>('', payload);
+
+        // Filter out results without documents and unwrap document fields
+        const documents = responseObj.reduce((docs: Document[], docItem: FirestoreAPI.RunQueryResponse) => {
+          if (docItem.document) {
+            const doc = new Document(docItem.document, { readTime: docItem.readTime } as Document);
+            docs.push(doc);
+          }
+          return docs;
+        }, []);
+
+        allDocuments.push(...documents);
+      }
+
+      return allDocuments;
     };
 
-    // Extract collection IDs from paths for multi-collection query
-    const collectionIds = collectionPaths.map(path => {
-      const grouped = Util_.getCollectionFromPath(path);
-      return grouped[1]; // Get the collection ID
-    });
-
-    return new Query(collectionIds, callback, false);
+    // Use first collection as placeholder - the actual execution will handle multiple collections
+    return new Query(collectionPaths[0], callback, false);
   }
 
   /**
